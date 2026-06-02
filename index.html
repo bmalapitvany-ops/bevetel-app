@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bevétel">
+<meta name="theme-color" content="#2a5c45">
+<link rel="manifest" href="manifest.json">
+<title>Napi Bevétel</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #f5f4f0; --surface: #ffffff; --surface2: #eeece8;
+  --border: rgba(0,0,0,0.09); --border2: rgba(0,0,0,0.16);
+  --text: #1a1a1a; --text2: #666; --text3: #aaa;
+  --accent: #2a5c45; --accent-bg: #e6f2ec; --accent-text: #1e4433;
+  --danger: #c0392b; --radius: 12px; --radius-sm: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111110; --surface: #1c1c1a; --surface2: #252522;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.15);
+    --text: #f0ede8; --text2: #999; --text3: #555;
+    --accent: #4a9e7a; --accent-bg: #1a2e25; --accent-text: #7dc4a0;
+  }
+}
+html, body { height: 100%; background: var(--bg); font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: var(--text); overscroll-behavior: none; }
+body { display: flex; flex-direction: column; height: 100dvh; }
+
+.header { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 0.5px solid var(--border); padding-top: env(safe-area-inset-top, 0); }
+.header-inner { display: flex; align-items: center; padding: 13px 16px; }
+.nav-btn { background: none; border: none; cursor: pointer; color: var(--accent); font-size: 26px; padding: 2px 10px; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
+.nav-btn:active { background: var(--surface2); }
+.month-label { flex: 1; text-align: center; font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+
+.summary-bar { display: flex; gap: 8px; padding: 10px 16px 13px; background: var(--surface); border-bottom: 0.5px solid var(--border); }
+.stat { flex: 1; background: var(--surface2); border-radius: var(--radius-sm); padding: 8px 10px; }
+.stat .lbl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+.stat .val { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .val.green { color: var(--accent); }
+
+.scroll { flex: 1; overflow-y: auto; padding: 14px 14px 60px; -webkit-overflow-scrolling: touch; }
+
+.week-block { margin-bottom: 18px; }
+.week-lbl { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; display: flex; justify-content: space-between; padding: 0 2px; margin-bottom: 7px; }
+.week-sum { color: var(--accent); }
+
+.day-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 7px; overflow: hidden; }
+.day-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; user-select: none; }
+.day-top:active { background: var(--surface2); }
+.day-left { display: flex; align-items: baseline; gap: 7px; }
+.day-name { font-size: 14px; font-weight: 600; }
+.day-date { font-size: 12px; color: var(--text3); }
+.day-right { display: flex; align-items: center; gap: 8px; }
+.day-sum { font-size: 13px; font-weight: 500; color: var(--text3); }
+.day-sum.has { color: var(--accent); }
+.chevron { color: var(--text3); font-size: 16px; transition: transform .2s; display: inline-block; }
+.chevron.open { transform: rotate(90deg); }
+
+.day-body { display: none; border-top: 0.5px solid var(--border); padding: 10px 12px 12px; }
+.day-body.open { display: block; }
+.entry-row { display: flex; gap: 6px; align-items: center; margin-bottom: 7px; }
+.entry-row input { border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text); padding: 9px 10px; font-size: 14px; outline: none; -webkit-appearance: none; }
+.entry-row input:focus { border-color: var(--accent); }
+.inp-desc { flex: 1; min-width: 0; }
+.inp-amt { width: 100px; }
+.del-btn { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 20px; padding: 4px 6px; border-radius: 6px; line-height: 1; flex-shrink: 0; }
+.del-btn:active { color: var(--danger); }
+.add-btn { display: inline-flex; align-items: center; gap: 5px; background: none; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); padding: 7px 12px; font-size: 13px; color: var(--text2); cursor: pointer; margin-top: 2px; }
+.add-btn:active { background: var(--surface2); }
+
+.empty { text-align: center; padding: 50px 20px; color: var(--text3); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-inner">
+    <button class="nav-btn" id="prev">&#8249;</button>
+    <span class="month-label" id="mlabel"></span>
+    <button class="nav-btn" id="next">&#8250;</button>
+  </div>
+  <div class="summary-bar">
+    <div class="stat"><div class="lbl">Összesen</div><div class="val green" id="s-total">0 Ft</div></div>
+    <div class="stat"><div class="lbl">Átlag/nap</div><div class="val" id="s-avg">0 Ft</div></div>
+    <div class="stat"><div class="lbl">Legjobb</div><div class="val" id="s-best">—</div></div>
+  </div>
+</div>
+<div class="scroll" id="scroll"></div>
+
+<script>
+const MONTHS=['Január','Február','Március','Április','Május','Június','Július','Augusztus','Szeptember','Október','November','December'];
+const DNAMES=['Hétfő','Kedd','Szerda','Csütörtök'];
+const LS='bev_v2';
+let cur={year:new Date().getFullYear(),month:new Date().getMonth()};
+let open=new Set();
+
+const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch{return{}}};
+const save=s=>localStorage.setItem(LS,JSON.stringify(s));
+const dk=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmt=n=>Math.round(n).toLocaleString('hu-HU')+' Ft';
+const dtotal=(s,k)=>(s[k]||[]).reduce((a,e)=>a+(parseFloat(e.a)||0),0);
+
+function workDays(y,m){const ds=[],d=new Date(y,m,1);while(d.getMonth()===m){if([1,2,3,4].includes(d.getDay()))ds.push(new Date(d));d.setDate(d.getDate()+1);}return ds;}
+function byWeek(ds){const ws=[];let w=[];ds.forEach(d=>{if(d.getDay()===1&&w.length){ws.push(w);w=[];}w.push(d);});if(w.length)ws.push(w);return ws;}
+function wnum(d){const j=new Date(d.getFullYear(),0,1);return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);}
+
+function render(){
+  const s=load();
+  document.getElementById('mlabel').textContent=`${MONTHS[cur.month]} ${cur.year}`;
+  const days=workDays(cur.year,cur.month);
+  const sc=document.getElementById('scroll');
+  sc.innerHTML='';
+  if(!days.length){sc.innerHTML='<div class="empty">Nincs munkap ebben a hónapban.</div>';return;}
+
+  let grand=0,bestV=0,bestL='—';
+  days.forEach(d=>{const t=dtotal(s,dk(d));grand+=t;if(t>bestV){bestV=t;bestL=`${DNAMES[d.getDay()-1]} ${d.getMonth()+1}/${d.getDate()}.`;}});
+  document.getElementById('s-total').textContent=fmt(grand);
+  document.getElementById('s-avg').textContent=fmt(grand/days.length);
+  document.getElementById('s-best').textContent=bestV>0?bestL:'—';
+
+  byWeek(days).forEach(wk=>{
+    const wt=wk.reduce((a,d)=>a+dtotal(s,dk(d)),0);
+    const bl=document.createElement('div');bl.className='week-block';
+    bl.innerHTML=`<div class="week-lbl"><span>${wnum(wk[0])}. hét</span><span class="week-sum">${wt>0?fmt(wt):''}</span></div>`;
+
+    wk.forEach(date=>{
+      const k=dk(date);
+      const entries=s[k]&&s[k].length?s[k]:[{d:'',a:''}];
+      const tot=dtotal(s,k);
+      const isOpen=open.has(k);
+
+      const card=document.createElement('div');card.className='day-card';
+      const top=document.createElement('div');top.className='day-top';
+      top.innerHTML=`<div class="day-left"><span class="day-name">${DNAMES[date.getDay()-1]}</span><span class="day-date">${date.getMonth()+1}. ${date.getDate()}.</span></div><div class="day-right"><span class="day-sum ${tot>0?'has':''}" id="dt-${k}">${tot>0?fmt(tot):'—'}</span><span class="chevron ${isOpen?'open':''}">›</span></div>`;
+      top.addEventListener('click',()=>{open.has(k)?open.delete(k):open.add(k);render();});
+
+      const body=document.createElement('div');body.className=`day-body${isOpen?' open':''}`;
+
+      entries.forEach((entry,j)=>{
+        const row=document.createElement('div');row.className='entry-row';
+        const di=document.createElement('input');di.type='text';di.className='inp-desc';di.placeholder='Megnevezés';di.value=entry.d||'';
+        di.addEventListener('input',e=>{const st=load();if(!st[k])st[k]=entries.map(x=>({...x}));st[k][j].d=e.target.value;save(st);refreshTotals(k,wk);});
+        const ai=document.createElement('input');ai.type='number';ai.className='inp-amt';ai.placeholder='Összeg (Ft)';ai.inputMode='decimal';ai.value=entry.a||'';
+        ai.addEventListener('input',e=>{const st=load();if(!st[k])st[k]=entries.map(x=>({...x}));st[k][j].a=e.target.value;save(st);refreshTotals(k,wk);});
+        const db=document.createElement('button');db.className='del-btn';db.innerHTML='&times;';
+        db.addEventListener('click',()=>{const st=load();if(st[k]&&st[k].length>1){st[k].splice(j,1);}else{st[k]=[{d:'',a:''}];}save(st);render();});
+        row.appendChild(di);row.appendChild(ai);row.appendChild(db);body.appendChild(row);
+      });
+
+      const ab=document.createElement('button');ab.className='add-btn';ab.textContent='+ Tétel';
+      ab.addEventListener('click',()=>{const st=load();if(!st[k])st[k]=[{d:'',a:''}];st[k].push({d:'',a:''});save(st);render();});
+      body.appendChild(ab);
+      card.appendChild(top);card.appendChild(body);bl.appendChild(card);
+    });
+    sc.appendChild(bl);
+  });
+}
+
+function refreshTotals(k, wk){
+  const s=load();
+  const tot=dtotal(s,k);
+  const el=document.getElementById('dt-'+k);
+  if(el){el.textContent=tot>0?fmt(tot):'—';el.className=`day-sum${tot>0?' has':''}`;}
+  const days=workDays(cur.year,cur.month);
+  let grand=0,bestV=0,bestL='—';
+  days.forEach(d=>{const t=dtotal(s,dk(d));grand+=t;if(t>bestV){bestV=t;bestL=`${DNAMES[d.getDay()-1]} ${d.getMonth()+1}/${d.getDate()}.`;}});
+  document.getElementById('s-total').textContent=fmt(grand);
+  document.getElementById('s-avg').textContent=fmt(grand/days.length);
+  document.getElementById('s-best').textContent=bestV>0?bestL:'—';
+  // update week total
+  const allWeeks=document.querySelectorAll('.week-sum');
+  const weeks=byWeek(days);
+  weeks.forEach((w,i)=>{const wt=w.reduce((a,d)=>a+dtotal(s,dk(d)),0);if(allWeeks[i])allWeeks[i].textContent=wt>0?fmt(wt):'';});
+}
+
+document.getElementById('prev').onclick=()=>{cur.month--;if(cur.month<0){cur.month=11;cur.year--;}open.clear();render();};
+document.getElementById('next').onclick=()=>{cur.month++;if(cur.month>11){cur.month=0;cur.year++;}open.clear();render();};
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+render();
+</script>
+</body>
+</html>
